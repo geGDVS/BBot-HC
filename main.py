@@ -6,6 +6,30 @@ from urllib.parse import urljoin, urlparse
 
 NICK = "BBot"
 
+# 定义忽略列表
+ignore_list = [
+    r'awa_ya.*',          # 以awa_ya开头的字符串
+    r'BoB.*',             # 以BoB开头的字符串
+    rf'{NICK}'
+]
+
+def matches_any_regex(s, regex_patterns):
+    """
+    判断字符串是否匹配正则表达式列表中的任何一个模式
+    
+    参数:
+        s: 要检查的字符串
+        regex_patterns: 正则表达式模式列表
+        
+    返回:
+        如果匹配任何一个模式返回True，否则返回False
+    """
+    for pattern in regex_patterns:
+        # 使用re.fullmatch检查整个字符串是否完全匹配模式
+        if re.fullmatch(pattern, s):
+            return True
+    return False
+
 def extract_urls(text):
     """
     从文本中提取所有网址
@@ -18,10 +42,10 @@ def extract_urls(text):
     """
     # 正则表达式模式，用于匹配各种形式的URL
     url_pattern = re.compile(
-        r'(?:https?://|www\.)'  # 匹配http://, https://或www.
-        r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+'  # 匹配域名
-        r'(?:[a-zA-Z]{2,6}\.?|[a-zA-Z0-9-]{2,}\.?)'  # 匹配顶级域名
-        r'(?:/?|[/?]\S+)'  # 匹配路径和参数
+        r'(?:https?://|ftp://|www\.)'  # 协议部分或www.开头
+        r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+'  # 域名
+        r'(?:[a-zA-Z]{2,6}\.?|[a-zA-Z0-9-]{2,}\.?)'  # 顶级域名
+        r'(?:/[^\s]*)?'  # 路径部分，匹配斜杠后的所有非空白字符
     )
     
     # 查找所有匹配的URL
@@ -128,7 +152,7 @@ def get_page_info(url):
 
 class YourChat(HackChat):
     def onMessage(self, sender, msg, trip):
-        if sender == NICK or sender.startswith("awa_ya") or sender.startswith("BoB"):
+        if matches_any_regex(sender, ignore_list):
             return
         # 判断msg是否为网址
         urls = extract_urls(msg)
@@ -142,14 +166,13 @@ class YourChat(HackChat):
                     self.sendMsg(page_info.get('error'))
                     return
                 if ret != "": ret += "\n---\n"
-                ret += f"""![](https://camo.hach.chat/?proxyUrl={page_info.get('favicon')})[{page_info.get('title')}]({page_info.get('url')})
-{page_info.get('description')}
-关键词：{page_info.get('keywords')}
-语言：{page_info.get('language')}
-标题：{page_info.get('h1_headings')}
-图片数量：{page_info.get('images_count')}
-包含{page_info.get('links_count')}个链接：{'，'.join(page_info.get('sample_links'))} 等
-"""
+                ret += f"![](https://camo.hach.chat/?proxyUrl={page_info.get('favicon')})[{page_info.get('title')}]({page_info.get('url')})\n"
+                ret += f"{page_info.get('description')}\n"
+                ret += f"关键词：{page_info.get('keywords')}\n"
+                ret += f"语言：{page_info.get('language')}\n"
+                ret += f"标题：{page_info.get('h1_headings')}\n"
+                ret += f"图片数量：{page_info.get('images_count')}\n"
+                ret += f"包含{page_info.get('links_count')}个链接：{'，'.join(page_info.get('sample_links'))} 等\n"
             self.sendMsg(ret)
             return
 
