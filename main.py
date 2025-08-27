@@ -34,7 +34,10 @@ class YourSQL:
                         name TEXT NOT NULL,
                         trip TEXT NOT NULL UNIQUE CHECK(LENGTH(trip) = 6),
                         coins REAL NOT NULL DEFAULT 0.0,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_message_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_message TEXT NOT NULL DEFAULT '',
+                        last_sign_time TIMESTAMP DEFAULT '1970-01-01 00:00:00.000000',
                     );"""
             c = conn.cursor()
             c.execute(sql)
@@ -261,7 +264,7 @@ class YourChat(HackChat):
             if not him_user:
                 him_user = YourSQL.get_user_by_name(conn, him)
             if him_user:
-                ret = f"上次`{him_user[1]}`出现是在=={him_user[5]}==, 说了`{him_user[7]}`。"
+                ret = f"上次`{him_user[1]}`出现是在=={him_user[5]}==, 说了`{him_user[6]}`。"
                 self.sendMsg(f"{ret}")
             else:
                 self.sendMsg(f"该用户未注册！")
@@ -273,13 +276,13 @@ class YourChat(HackChat):
                 ret += f"识别码: {user[2]}\n"
                 ret += f"Bcoin余额: {user[3]}\n"
                 ret += f"注册时间: {user[4]}\n"
-                ret += f"上次签到时间：{user[6]}\n"
+                ret += f"上次签到时间：{user[7]}\n"
                 self.sendMsg(f"/w {sender} {ret}")
             else:
                 self.sendMsg(f"@{sender} 您还未注册，请使用`{PREFIX}register <昵称>`进行注册。")
         if msg == f"{PREFIX}sign":
             if user:
-                if is_over_1h(datetime.strptime(user[6], "%Y-%m-%d %H:%M:%S.%f"), datetime.now()):
+                if is_over_1h(datetime.strptime(user[7], "%Y-%m-%d %H:%M:%S.%f"), datetime.now()):
                     new_coins = user[3] + 1
                     success = YourSQL.update_user_coins(conn, trip, new_coins)
                     if success:
@@ -309,6 +312,6 @@ if __name__ == "__main__":
         YourSQL.create_user_table(conn)
     else:
         print("无法创建数据库连接")
-    chat = YourChat("lounge", f"{NICK}#password")
+    chat = YourChat("bot", f"{NICK}#password")
     chat.run()
     conn.close()
