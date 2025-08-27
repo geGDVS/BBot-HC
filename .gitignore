@@ -32,6 +32,7 @@ ENV/
 *.venv
 
 # 测试相关
+test.py
 htmlcov/
 .tox/
 .nox/
@@ -71,4 +72,6 @@ instance/
 # 操作系统文件
 .DS_Store
 Thumbs.db
-    
+
+# 数据库
+users.db
