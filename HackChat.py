@@ -1,4 +1,4 @@
-import json, websocket, ssl, re, socks, socket
+import json, websocket, re
 
 def verifyNick(nick) -> bool:
     return re.match(r"^@?[\w]{1,24}$", nick)
