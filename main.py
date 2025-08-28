@@ -6,9 +6,37 @@ from urllib.parse import urljoin, urlparse
 import sqlite3
 from sqlite3 import Error
 from datetime import datetime
+import json
+from typing import Any, Optional
 
-NICK = "BBot"
-PREFIX = ":!"
+class YourJson:
+    def read_json_file(file_path: str) -> Optional[Any]:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                return json.load(file)
+        except FileNotFoundError:
+            print(f"错误: 文件 '{file_path}' 不存在")
+        except json.JSONDecodeError:
+            print(f"错误: 文件 '{file_path}' 不是有效的 JSON 格式")
+        except Exception as e:
+            print(f"读取文件 '{file_path}' 时发生错误: {str(e)}")
+        return None
+    def save_json_file(data: Any, file_path: str, indent: int = 4) -> bool:
+        try:
+            with open(file_path, 'w', encoding='utf-8') as file:
+                json.dump(data, file, ensure_ascii=False, indent=indent)
+            print(f"数据已成功保存到 '{file_path}'")
+            return True
+        except TypeError:
+            print("错误: 数据包含无法序列化为 JSON 的类型")
+        except Exception as e:
+            print(f"保存文件 '{file_path}' 时发生错误: {str(e)}")
+        return False
+
+loaded_data = YourJson.read_json_file("settings.json")
+PREFIX = loaded_data["prefix"]
+ignore_list = loaded_data["ignore_list"]
+ignore_list.append(loaded_data["name"])
 
 def is_over_1h(dt1: datetime, dt2: datetime) -> bool:
     # 计算时间差的绝对值（总秒数）
@@ -22,6 +50,7 @@ class YourSQL:
         conn = None
         try:
             conn = sqlite3.connect(db_file)
+            conn.row_factory = sqlite3.Row
             return conn
         except Error as e:
             print(e)
@@ -38,6 +67,7 @@ class YourSQL:
                         last_message_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         last_message TEXT NOT NULL DEFAULT '',
                         last_sign_time TIMESTAMP DEFAULT '1970-01-01 00:00:00.000000',
+                        level INTEGER NOT NULL DEFAULT 0
                     );"""
             c = conn.cursor()
             c.execute(sql)
@@ -75,12 +105,22 @@ class YourSQL:
         """根据识别码查询用户"""
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE trip=?", (trip,))
-        return cur.fetchone()
+        # 获取结果行
+        row = cur.fetchone()
+        # 如果有结果，转换为字典返回
+        if row:
+            return dict(row)
+        return None
     def get_user_by_name(conn, name):
         """根据昵称查询用户"""
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE name=?", (name,))
-        return cur.fetchone()
+        # 获取结果行
+        row = cur.fetchone()
+        # 如果有结果，转换为字典返回
+        if row:
+            return dict(row)
+        return None
     def update_user_coins(conn, trip, new_coins):
         """更新用户金币"""
         try:
@@ -106,13 +146,6 @@ class YourSQL:
         except Error as e:
             print(f"更新状态失败: {e}")
             return False
-
-# 忽略列表
-ignore_list = [
-    r'awa_ya.*',          # 以awa_ya开头的字符串
-    r'BoB.*',             # 以BoB开头的字符串
-    rf'{NICK}'
-]
 
 class YourWeb:
     def matches_any_regex(s, regex_patterns):
@@ -264,33 +297,34 @@ class YourChat(HackChat):
             if not him_user:
                 him_user = YourSQL.get_user_by_name(conn, him)
             if him_user:
-                ret = f"上次`{him_user[1]}`出现是在=={him_user[5]}==, 说了`{him_user[6]}`。"
+                ret = f"上次`{him_user['name']}`出现是在=={him_user['last_message_time']}==, 说了`{him_user['last_message']}`。"
                 self.sendMsg(f"{ret}")
             else:
                 self.sendMsg(f"该用户未注册！")
         if msg == (f"{PREFIX}me"):
             if user:
                 ret = f"查询结果: \n"
-                ret += f"ID: {user[0]}\n"
-                ret += f"昵称: {user[1]}\n"
-                ret += f"识别码: {user[2]}\n"
-                ret += f"Bcoin余额: {user[3]}\n"
-                ret += f"注册时间: {user[4]}\n"
-                ret += f"上次签到时间：{user[7]}\n"
+                ret += f"ID: {user['id']}\n"
+                ret += f"昵称: {user['name']}\n"
+                ret += f"识别码: {user['trip']}\n"
+                ret += f"用户等级：{user['level']}\n"
+                ret += f"Bcoin余额: {user['coins']}\n"
+                ret += f"注册时间: {user['created_at']}\n"
+                ret += f"上次签到时间：{user['last_sign_time']}\n"
                 self.sendMsg(f"/w {sender} {ret}")
             else:
                 self.sendMsg(f"@{sender} 您还未注册，请使用`{PREFIX}register <昵称>`进行注册。")
         if msg == f"{PREFIX}sign":
             if user:
-                if is_over_1h(datetime.strptime(user[7], "%Y-%m-%d %H:%M:%S.%f"), datetime.now()):
-                    new_coins = user[3] + 1
+                if is_over_1h(datetime.strptime(user['last_sign_time'], "%Y-%m-%d %H:%M:%S.%f"), datetime.now()):
+                    new_coins = user['coins'] + 1
                     success = YourSQL.update_user_coins(conn, trip, new_coins)
                     if success:
                         self.sendMsg(f"@{sender} 您签到获得 1 BCoin，当前余额: {new_coins}")
                     else:
                         self.sendMsg(f"@{sender} 签到失败")
                 else:
-                    self.sendMsg(f"@{sender} 您上次签到时间({user[6]})距离现在不足1小时，请稍后再来。")
+                    self.sendMsg(f"@{sender} 您上次签到时间({user['last_sign_time']})距离现在不足1小时，请稍后再来。")
             else:
                 self.sendMsg(f"@{sender} 您还未注册")
         if msg == f"{PREFIX}help":
@@ -305,6 +339,15 @@ class YourChat(HackChat):
             YourSQL.update_user_status(conn, trip, msg)
         conn.commit()
 
+    def onWhisper(self, sender, msg, trip):
+        user = YourSQL.get_user_by_trip(conn, trip)
+        if user:    
+            if user['level'] >= 4:
+                if msg.startswith("send "):
+                    _, ret = msg.split(" ", 1)
+                    self.sendMsg(ret)
+                    return
+
 if __name__ == "__main__":
     database = "users.db"
     conn = YourSQL.create_connection(database)
@@ -312,6 +355,6 @@ if __name__ == "__main__":
         YourSQL.create_user_table(conn)
     else:
         print("无法创建数据库连接")
-    chat = YourChat("bot", f"{NICK}#password")
+    chat = YourChat(loaded_data["channel"], f"{loaded_data["name"]}#{loaded_data["password"]}")
     chat.run()
     conn.close()

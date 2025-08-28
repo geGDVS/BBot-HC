@@ -57,7 +57,7 @@ class HackChat:
     def onSet(self, nicks: list, users: list):
         self.onlineUsers = nicks
 
-    def onWhisper(self, sender: str, msg: str):
+    def onWhisper(self, sender: str, msg: str, trip: str):
         if isinstance(sender, int) or sender == self.nick: return
 
     def onInvite(self, sender: str, channel: str):
@@ -89,7 +89,7 @@ class HackChat:
                 self.onEmote(result["nick"], result["text"].split(" ", 1)[1])
             # 接收到私信
             elif type_ == "whisper":
-                self.onWhisper(result["from"], result["text"].split(": ", 1)[1])
+                self.onWhisper(result["from"], result["text"].split(": ", 1)[1], result.get("trip", ""))
             # 被人邀请
             elif type_ == "invite":
                 self.onInvite(result["from"], result["inviteChannel"])

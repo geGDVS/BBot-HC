@@ -1,0 +1,10 @@
+{
+    "name": "BBot",
+    "channel": "lounge",
+    "password": "",
+    "prefix": ":!",
+    "ignore_list": [
+        "awa_ya.*",
+        "BoB.*"
+    ]
+}
