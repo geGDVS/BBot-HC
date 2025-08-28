@@ -8,6 +8,8 @@ from sqlite3 import Error
 from datetime import datetime
 import json
 from typing import Any, Optional
+import pytz
+TZ = pytz.timezone('Asia/Shanghai')
 
 class YourJson:
     def read_json_file(file_path: str) -> Optional[Any]:
@@ -128,7 +130,7 @@ class YourSQL:
                     SET coins = ?, last_sign_time = ?
                     WHERE trip = ?'''
             cur = conn.cursor()
-            cur.execute(sql, (new_coins, datetime.now(), trip))
+            cur.execute(sql, (new_coins, datetime.now(TZ), trip))
             conn.commit()
             return cur.rowcount > 0
         except Error as e:
@@ -140,7 +142,7 @@ class YourSQL:
                     SET last_message = ?, last_message_time = ?
                     WHERE trip = ?'''
             cur = conn.cursor()
-            cur.execute(sql, (msg, datetime.now(), trip))
+            cur.execute(sql, (msg, datetime.now(TZ), trip))
             conn.commit()
             return cur.rowcount > 0
         except Error as e:
@@ -316,7 +318,11 @@ class YourChat(HackChat):
                 self.sendMsg(f"@{sender} 您还未注册，请使用`{PREFIX}register <昵称>`进行注册。")
         if msg == f"{PREFIX}sign":
             if user:
-                if is_over_1h(datetime.strptime(user['last_sign_time'], "%Y-%m-%d %H:%M:%S.%f"), datetime.now()):
+                try:
+                    lastSignTime = datetime.strptime(user['last_sign_time'], "%Y-%m-%d %H:%M:%S.%f%z")
+                except:
+                    lastSignTime = datetime.strptime(user['last_sign_time'], "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=TZ)
+                if is_over_1h(lastSignTime, datetime.now(TZ)):
                     new_coins = user['coins'] + 1
                     success = YourSQL.update_user_coins(conn, trip, new_coins)
                     if success:
